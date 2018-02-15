@@ -5,7 +5,7 @@ After=network.target ntpdate.service
 [Service]
 Environment=VIRTUAL_ENV=/home/pi/voice-recognizer-raspi/env
 Environment=PATH=/home/pi/voice-recognizer-raspi/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
-ExecStart=/home/pi/voice-recognizer-raspi/env/bin/python3 -u src/main.py
+ExecStart=/home/pi/voice-recognizer-raspi/env/bin/python3 -u src/main.py -T 'ok-google' --trigger-sound='/home/pi/Music/google_notification.wav' -L 'es-ES'
 WorkingDirectory=/home/pi/voice-recognizer-raspi
 StandardOutput=inherit
 StandardError=inherit
