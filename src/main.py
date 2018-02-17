@@ -64,6 +64,8 @@ ASSISTANT_CREDENTIALS = (
     os.path.join(VR_CACHE_DIR, 'assistant_credentials.json')
 )
 
+print(os.path.join(VR_CACHE_DIR, 'assistant_credentials.json'))
+
 # Where the locale/language bundles are stored
 LOCALE_DIR = os.path.realpath(
     os.path.join(os.path.abspath(os.path.dirname(__file__)), '../po'))

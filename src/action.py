@@ -23,9 +23,6 @@ from rgbxy import Converter
 
 import actionbase
 
-# Load sensor libs
-import Adafruit_DHT
-
 # =============================================================================
 #
 # Hey, Makers!
@@ -261,27 +258,12 @@ class PowerCommand(object):
             logging.error("Error identifying power command.")
             self.say("Sorry I didn't identify that command")
 
-
-# Temperature: Gets data from DHT22
-# ================================
-# Retrieve the sensor data and say it
-#
-
-class TemperatureSensor(object):
-    """Shutdown or reboot the pi"""
-
-    def __init__(self, say):
-        self.sensor = Adafruit_DHT.DHT22
-        self.pin = 4
-        self.say = say
-
-    def run(self, voice_command):
-        humidity, temperature = Adafruit_DHT.read_retry(self.sensor, self.pin)
-        self.say('{0:0.1f} degrees and {1:0.1f} percent of humidity'.format(temperature, humidity))
-
 # =========================================
 # Makers! Implement your own actions here.
 # =========================================
+
+from custom.temperature import Temperature
+from custom.youtube import Youtube
 
 def make_actor(say):
     """Create an actor to carry out the user's commands."""
@@ -306,7 +288,12 @@ def make_actor(say):
 
     actor.add_keyword(_('raspberry power off'), PowerCommand(say, 'shutdown'))
     actor.add_keyword(_('raspberry reboot'), PowerCommand(say, 'reboot'))
-    actor.add_keyword(_('temperature'), TemperatureSensor(say))
+    actor.add_keyword(_('temperature'), Temperature(say))
+    actor.add_keyword(_('play'),
+                      Youtube(say, _('play')))
+    actor.add_keyword(_('stop song'),
+                      Youtube(say, _('stop')))
+
 
     return actor
 
