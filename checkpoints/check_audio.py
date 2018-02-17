@@ -29,6 +29,7 @@ import aiy.audio  # noqa
 
 CARDS_PATH = '/proc/asound/cards'
 VOICEHAT_ID = 'googlevoicehat'
+# VOICEHAT_ID = ‘bcm2835’
 
 SERVICE_NAME = 'voice-recognizer'
 ACTIVE_STR = 'ActiveState=active'
