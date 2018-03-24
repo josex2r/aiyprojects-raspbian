@@ -1,7 +1,6 @@
 import aiy.voicehat
 # Load sensor libs
-# from 'adafruit-dht' import Adafruit_DHT
-Adafruit_DHT = __import__('adafruit-dht')
+import Adafruit_DHT
 
 # Temperature: Gets data from DHT22
 # ================================

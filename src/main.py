@@ -24,6 +24,7 @@ The Google Assistant Library can be installed with:
 It is available for Raspberry Pi 2/3 only; Pi Zero is not supported.
 """
 
+
 import logging
 import subprocess
 import sys
@@ -38,7 +39,9 @@ from google.assistant.library.event import EventType
 # Custom scripts
 from custom.play_sound import play_sound
 from custom.temperature import say_temperature
-# from custom.youtube import Youtube
+from custom.youtube import play_song
+from custom.youtube import stop_song
+
 
 logging.basicConfig(
     level=logging.INFO,
@@ -87,6 +90,13 @@ def process_event(assistant, event):
         elif text == 'temperature':
             assistant.stop_conversation()
             say_temperature()
+        elif text.startswith('play'):
+            assistant.stop_conversation()
+            song = text.replace('play', '', 1)
+            play_song(song)
+        elif text == 'stop':
+            assistant.stop_conversation()
+            stop_song()
 
     elif event.type == EventType.ON_END_OF_UTTERANCE:
         status_ui.status('thinking')
