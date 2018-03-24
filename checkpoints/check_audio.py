@@ -27,6 +27,7 @@ import aiy.audio  # noqa
 
 CARDS_PATH = '/proc/asound/cards'
 VOICEHAT_ID = 'googlevoicehat'
+# VOICEHAT_ID = ‘bcm2835’
 
 STOP_DELAY = 1.0
 
