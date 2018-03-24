@@ -1,3 +1,23 @@
+### Installing
+
+From lockfile:
+
+```
+pip install -r requirements.txt
+```
+
+Save deps:
+
+```
+pip freeze | grep -v "pkg-resources" > requirements.txt
+```
+
+Uninstall all:
+
+```
+pip freeze | xargs pip uninstall -y
+```
+
 <img src="https://aiyprojects.withgoogle.com/static/images/icons/aiy-circular-logo.svg" width="40%">
 
 This repository contains an easy-to-use API for the AIY Voice Kit.
