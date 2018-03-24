@@ -28,19 +28,24 @@ It is available for Raspberry Pi 2/3 only; Pi Zero is not supported.
 import logging
 import subprocess
 import sys
+import os.path
 
 import aiy.assistant.auth_helpers
 import aiy.assistant.device_helpers
 import aiy.audio
 import aiy.voicehat
+import aiy.i18n
 from google.assistant.library import Assistant
 from google.assistant.library.event import EventType
 
 # Custom scripts
-from custom.play_sound import play_sound
 from custom.temperature import say_temperature
 from custom.youtube import play_song
 from custom.youtube import stop_song
+
+
+# aiy.i18n.set_language_code('fr-FR')
+aiy.audio.set_tts_volume(100)
 
 
 logging.basicConfig(
@@ -66,6 +71,8 @@ def say_ip():
 
 def process_event(assistant, event):
     status_ui = aiy.voicehat.get_status_ui()
+    status_ui.set_trigger_sound_wave('sounds/google_notification.wav')
+
     if event.type == EventType.ON_START_FINISHED:
         status_ui.status('ready')
         if sys.stdout.isatty():
@@ -73,7 +80,6 @@ def process_event(assistant, event):
 
     elif event.type == EventType.ON_CONVERSATION_TURN_STARTED:
         status_ui.status('listening')
-        play_sound('sounds/google_notification.wav')
 
     elif event.type == EventType.ON_RECOGNIZING_SPEECH_FINISHED and event.args:
         print('You said:', event.args['text'])
