@@ -42,10 +42,11 @@ from google.assistant.library.event import EventType
 from custom.temperature import say_temperature
 from custom.youtube import play_song
 from custom.youtube import stop_song
+from custom.dialogflow import call
 
 
-# aiy.i18n.set_language_code('fr-FR')
-aiy.audio.set_tts_volume(100)
+aiy.i18n.set_language_code('en-GB')
+# aiy.audio.set_tts_volume(100)
 
 
 logging.basicConfig(
@@ -74,16 +75,26 @@ def process_event(assistant, event):
     status_ui.set_trigger_sound_wave('sounds/google_notification.wav')
 
     if event.type == EventType.ON_START_FINISHED:
+        print('ON_START_FINISHED')
         status_ui.status('ready')
         if sys.stdout.isatty():
             print('Say "OK, Google" then speak, or press Ctrl+C to quit...')
 
     elif event.type == EventType.ON_CONVERSATION_TURN_STARTED:
+        print('ON_CONVERSATION_TURN_STARTED')
         status_ui.status('listening')
 
     elif event.type == EventType.ON_RECOGNIZING_SPEECH_FINISHED and event.args:
+        print('ON_RECOGNIZING_SPEECH_FINISHED')
         print('You said:', event.args['text'])
         text = event.args['text'].lower()
+        flow_response = call(text)
+        action = flow_response['result']['action']
+        if 'unknown' not in action:
+            print('Dialogflow action received:', action)
+            assistant.stop_conversation()
+            if action == 'temperature.inside':
+                say_temperature()
         if text == 'power off':
             assistant.stop_conversation()
             power_off_pi()
@@ -93,9 +104,6 @@ def process_event(assistant, event):
         elif text == 'ip address':
             assistant.stop_conversation()
             say_ip()
-        elif text == 'temperature':
-            assistant.stop_conversation()
-            say_temperature()
         elif text.startswith('play'):
             assistant.stop_conversation()
             song = text.replace('play', '', 1)
@@ -104,13 +112,20 @@ def process_event(assistant, event):
             assistant.stop_conversation()
             stop_song()
 
+    elif event.type == EventType.ON_NO_RESPONSE:
+        print('ON_NO_RESPONSE')
+        assistant.stop_conversation()
+
     elif event.type == EventType.ON_END_OF_UTTERANCE:
+        print('ON_END_OF_UTTERANCE')
         status_ui.status('thinking')
 
     elif event.type == EventType.ON_CONVERSATION_TURN_FINISHED:
+        print('ON_CONVERSATION_TURN_FINISHED')
         status_ui.status('ready')
 
     elif event.type == EventType.ON_ASSISTANT_ERROR and event.args and event.args['is_fatal']:
+        print('ON_ASSISTANT_ERROR')
         sys.exit(1)
 
 
