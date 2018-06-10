@@ -43,6 +43,7 @@ from custom.temperature import say_temperature
 from custom.youtube import play_song
 from custom.youtube import stop_song
 from custom.dialogflow import call
+from custom.madrid_opendata import get_timetable_for
 
 
 aiy.i18n.set_language_code('en-GB')
@@ -95,6 +96,17 @@ def process_event(assistant, event):
             assistant.stop_conversation()
             if action == 'temperature.inside':
                 say_temperature()
+            if action == 'timetable.bus':
+                get_timetable_for(flow_response['result']['parameters']['number-integer'])
+            if action == 'youtube.play':
+                parameters = flow_response['result']['parameters']
+                query = parameters['music-genre']
+                if parameters['music-artist']:
+                    query = parameters['music-artist']
+                if parameters['any']:
+                    query = parameters['any']
+                if query:
+                    play_song(query)
         if text == 'power off':
             assistant.stop_conversation()
             power_off_pi()
@@ -104,10 +116,6 @@ def process_event(assistant, event):
         elif text == 'ip address':
             assistant.stop_conversation()
             say_ip()
-        elif text.startswith('play'):
-            assistant.stop_conversation()
-            song = text.replace('play', '', 1)
-            play_song(song)
         elif text == 'stop':
             assistant.stop_conversation()
             stop_song()

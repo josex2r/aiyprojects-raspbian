@@ -1,9 +1,8 @@
-import logging
 import subprocess
 import aiy.voicehat
 
 def play_song(song):
-    logging.info('Playing song: ', song)
+    print('Playing song: ', song)
     aiy.audio.say('Downloading ' + song)
     song_player = subprocess.Popen(['/usr/local/bin/mpsyt', ''], stdin=subprocess.PIPE, stdout=subprocess.PIPE)
     # Search the song
@@ -14,7 +13,7 @@ def play_song(song):
 
 
 def stop_song():
-    logging.info('Stopping songs')
+    print('Stopping songs')
     vlc = subprocess.Popen(['/usr/bin/pkill', 'vlc'], stdin=subprocess.PIPE, stdout=subprocess.PIPE)
     vlc.stdin.flush()
 
