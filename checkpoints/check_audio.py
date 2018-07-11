@@ -15,19 +15,27 @@
 
 """Check that the voiceHAT audio input and output are both working."""
 
+
+import fileinput
 import os
+import re
+import subprocess
 import sys
 import tempfile
 import textwrap
 import traceback
 
-sys.path.append(os.path.realpath(os.path.join(__file__, '..', '..')) + '/src/')
-
 import aiy.audio  # noqa
+from aiy._drivers._hat import get_aiy_device_name
+
+AIY_PROJECTS_DIR = os.path.dirname(os.path.dirname(__file__))
 
 CARDS_PATH = '/proc/asound/cards'
-VOICEHAT_ID = 'googlevoicehat'
-# VOICEHAT_ID = ‘bcm2835’
+CARDS_ID = {
+    "Voice Hat": "googlevoicehat",
+    #"Voice Hat": "bcm2835",
+    "Voice Bonnet": "aiy-voicebonnet",
+}
 
 STOP_DELAY = 1.0
 
@@ -63,14 +71,30 @@ def ask(prompt):
 
 
 def check_voicehat_present():
-    """Check that the voiceHAT is present."""
-    return any(VOICEHAT_ID in card for card in get_sound_cards().values())
+    """Check that the voiceHAT audio driver is present."""
+    card_id = CARDS_ID[get_aiy_device_name()]
+    return any(card_id in card for card in get_sound_cards().values())
 
 
 def check_voicehat_is_first_card():
     """Check that the voiceHAT is the first card on the system."""
     cards = get_sound_cards()
-    return 0 in cards and VOICEHAT_ID in cards[0]
+    card_id = CARDS_ID[get_aiy_device_name()]
+    return 0 in cards and card_id in cards[0]
+
+
+def check_asoundrc_is_not_bad():
+    """Check that ~/.asoundrc is absent or has the AIY config."""
+    asoundrc = os.path.expanduser('~/.asoundrc')
+    if not os.path.exists(asoundrc):
+        return True
+
+    with open(os.path.join(AIY_PROJECTS_DIR, 'scripts', 'asound.conf')) as f:
+        wanted_contents = f.read()
+    with open(asoundrc) as f:
+        contents = f.read()
+
+    return contents == wanted_contents
 
 
 def check_speaker_works():
@@ -115,10 +139,20 @@ how to setup the voiceHAT driver: https://git.io/v99yK"""))
 may be unable to find it. Please try removing other sound drivers."""))
         return
 
-    if not check_speaker_works():
-        print(textwrap.fill(
-            """There may be a problem with your speaker. Check that it's
+    try:
+        if not check_speaker_works():
+            print(textwrap.fill(
+                """There may be a problem with your speaker. Check that it's
 connected properly."""))
+            return
+    except BrokenPipeError:
+        # aplay crashed - check if ~/.asoundrc is the culprit
+        if not check_asoundrc_is_not_bad():
+            print(textwrap.fill(
+                """~/.asoundrc exists, and it doesn't have the expected
+contents. Try deleting it with `rm ~/.asoundrc`."""))
+        else:
+            print("aplay crashed - try checking your ALSA config.")
         return
 
     if not check_mic_works():

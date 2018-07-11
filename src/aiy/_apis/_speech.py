@@ -36,7 +36,7 @@ except ImportError:
     sys.exit(1)
 
 from google.rpc import code_pb2 as error_code
-from google.assistant.embedded.v1alpha1 import (
+from google.assistant.embedded.v1alpha2 import (
     embedded_assistant_pb2,
     embedded_assistant_pb2_grpc,
 )
@@ -221,10 +221,6 @@ class GenericSpeechRequest(object):
 
     def _handle_response_stream(self, response_stream):
         for resp in response_stream:
-            if resp.error.code != error_code.OK:
-                self._end_audio_request()
-                raise Error('Server error: ' + resp.error.message)
-
             if self._stop_sending_audio(resp):
                 self._end_audio_request()
 
@@ -299,8 +295,6 @@ class CloudSpeechRequest(GenericSpeechRequest):
 
         super().__init__('speech.googleapis.com', credentials)
 
-        self.language_code = aiy.i18n.get_language_code()
-
         self._transcript = None
 
     def reset(self):
@@ -314,9 +308,7 @@ class CloudSpeechRequest(GenericSpeechRequest):
         recognition_config = types.RecognitionConfig(
             encoding=enums.RecognitionConfig.AudioEncoding.LINEAR16,
             sample_rate_hertz=AUDIO_SAMPLE_RATE_HZ,
-            # For a list of supported languages see:
-            # https://cloud.google.com/speech/docs/languages.
-            language_code=self.language_code,  # a BCP-47 language tag
+            language_code=aiy.i18n.get_language_code(),
             speech_contexts=[self._get_speech_context()],
         )
         streaming_config = types.StreamingRecognitionConfig(
@@ -344,7 +336,8 @@ class CloudSpeechRequest(GenericSpeechRequest):
                 resp.speech_event_type)
             logger.info('endpointer_type: %s', speech_event_type)
 
-        END_OF_SINGLE_UTTERANCE = types.StreamingRecognizeResponse.SpeechEventType.Value('END_OF_SINGLE_UTTERANCE')
+        END_OF_SINGLE_UTTERANCE = types.StreamingRecognizeResponse.SpeechEventType.Value(
+            'END_OF_SINGLE_UTTERANCE')
         return resp.speech_event_type == END_OF_SINGLE_UTTERANCE
 
     def _handle_response(self, resp):
@@ -363,9 +356,26 @@ class AssistantSpeechRequest(GenericSpeechRequest):
 
     """A request to the Assistant API, which returns audio and text."""
 
-    def __init__(self, credentials):
+    def __init__(self, credentials, model_id, device_id):
 
         super().__init__('embeddedassistant.googleapis.com', credentials)
+
+        self.model_id = model_id
+        self.device_id = device_id
+
+        # google-assistant-library stores its volume levels in this location.
+        # If it exists, use that to set our volume.
+        volume_path = os.path.expanduser(
+            '~/.config/google-assistant-library/assistant/volume/system')
+        if os.path.exists(volume_path) and os.path.isfile(volume_path):
+            with open(volume_path, 'r') as f:
+                try:
+                    self._volume_percentage = int(
+                        float(f.readline().strip()) * 100)
+                except ValueError:
+                    self._volume_percentage = 60
+        else:
+            self._volume_percentage = 60
 
         self._conversation_state = None
         self._response_audio = b''
@@ -387,50 +397,70 @@ class AssistantSpeechRequest(GenericSpeechRequest):
         audio_out_config = embedded_assistant_pb2.AudioOutConfig(
             encoding='LINEAR16',
             sample_rate_hertz=AUDIO_SAMPLE_RATE_HZ,
-            volume_percentage=50,
+            volume_percentage=self._volume_percentage,
         )
-        converse_state = embedded_assistant_pb2.ConverseState(
+        device_config = embedded_assistant_pb2.DeviceConfig(
+            device_id=self.device_id,
+            device_model_id=self.model_id,
+        )
+        dialog_state_in = embedded_assistant_pb2.DialogStateIn(
             conversation_state=self._conversation_state,
+            language_code=aiy.i18n.get_language_code(),
         )
-        converse_config = embedded_assistant_pb2.ConverseConfig(
+        assist_config = embedded_assistant_pb2.AssistConfig(
             audio_in_config=audio_in_config,
             audio_out_config=audio_out_config,
-            converse_state=converse_state,
+            device_config=device_config,
+            dialog_state_in=dialog_state_in,
         )
 
-        return embedded_assistant_pb2.ConverseRequest(config=converse_config)
+        return embedded_assistant_pb2.AssistRequest(config=assist_config)
 
     def _create_audio_request(self, data):
-        return embedded_assistant_pb2.ConverseRequest(audio_in=data)
+        return embedded_assistant_pb2.AssistRequest(audio_in=data)
 
     def _create_response_stream(self, service, request_stream, deadline):
-        return service.Converse(request_stream, deadline)
+        return service.Assist(request_stream, deadline)
 
     def _stop_sending_audio(self, resp):
         if resp.event_type:
             logger.info('event_type: %s', resp.event_type)
 
         return (resp.event_type ==
-                embedded_assistant_pb2.ConverseResponse.END_OF_UTTERANCE)
+                embedded_assistant_pb2.AssistResponse.END_OF_UTTERANCE)
 
     def _handle_response(self, resp):
         """Accumulate audio and text from the remote end. It will be handled
         in _finish_request().
         """
 
-        if resp.result.spoken_request_text:
-            logger.info('transcript: %s', resp.result.spoken_request_text)
-            self._transcript = resp.result.spoken_request_text
+        if resp.speech_results:
+            self._transcript = ' '.join(r.transcript for r in resp.speech_results)
+            logger.info('transcript: %s', self._transcript)
 
         self._response_audio += resp.audio_out.audio_data
 
-        if resp.result.conversation_state:
-            self._conversation_state = resp.result.conversation_state
+        if resp.dialog_state_out.volume_percentage:
+            # Store our new volume level in the google-assistant-library path.
+            volume_path = os.path.expanduser(
+                '~/.config/google-assistant-library/assistant/volume/system')
+            try:
+                os.makedirs(os.path.dirname(volume_path))
+            except FileExistsError:
+                pass
 
-        if resp.result.microphone_mode:
+            with open(volume_path, 'w') as f:
+                f.write('%f\n' %
+                        (resp.dialog_state_out.volume_percentage / 100.0))
+            self._volume_percentage = resp.dialog_state_out.volume_percentage
+
+        if resp.dialog_state_out.conversation_state:
+            self._conversation_state = resp.dialog_state_out.conversation_state
+
+        if resp.dialog_state_out.microphone_mode:
             self.dialog_follow_on = (
-                resp.result.microphone_mode ==
-                embedded_assistant_pb2.ConverseResult.DIALOG_FOLLOW_ON)
+                resp.dialog_state_out.microphone_mode ==
+                embedded_assistant_pb2.DialogStateOut.DIALOG_FOLLOW_ON)
 
     def _finish_request(self):
         super()._finish_request()

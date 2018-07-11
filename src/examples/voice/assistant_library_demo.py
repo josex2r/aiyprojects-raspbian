@@ -18,21 +18,16 @@
 The Google Assistant Library has direct access to the audio API, so this Python
 code doesn't need to record audio. Hot word detection "OK, Google" is supported.
 
-The Google Assistant Library can be installed with:
-    env/bin/pip install google-assistant-library==0.0.2
-
 It is available for Raspberry Pi 2/3 only; Pi Zero is not supported.
 """
 
 import logging
-import subprocess
+import platform
 import sys
 
 import aiy.assistant.auth_helpers
-import aiy.assistant.device_helpers
-import aiy.audio
+from aiy.assistant.library import Assistant
 import aiy.voicehat
-from google.assistant.library import Assistant
 from google.assistant.library.event import EventType
 
 logging.basicConfig(
@@ -41,22 +36,7 @@ logging.basicConfig(
 )
 
 
-def power_off_pi():
-    aiy.audio.say('Good bye!')
-    subprocess.call('sudo shutdown now', shell=True)
-
-
-def reboot_pi():
-    aiy.audio.say('See you in a bit!')
-    subprocess.call('sudo reboot', shell=True)
-
-
-def say_ip():
-    ip_address = subprocess.check_output("hostname -I | cut -d' ' -f1", shell=True)
-    aiy.audio.say('My IP address is %s' % ip_address.decode('utf-8'))
-
-
-def process_event(assistant, event):
+def process_event(event):
     status_ui = aiy.voicehat.get_status_ui()
     if event.type == EventType.ON_START_FINISHED:
         status_ui.status('ready')
@@ -66,23 +46,12 @@ def process_event(assistant, event):
     elif event.type == EventType.ON_CONVERSATION_TURN_STARTED:
         status_ui.status('listening')
 
-    elif event.type == EventType.ON_RECOGNIZING_SPEECH_FINISHED and event.args:
-        print('You said:', event.args['text'])
-        text = event.args['text'].lower()
-        if text == 'power off':
-            assistant.stop_conversation()
-            power_off_pi()
-        elif text == 'reboot':
-            assistant.stop_conversation()
-            reboot_pi()
-        elif text == 'ip address':
-            assistant.stop_conversation()
-            say_ip()
-
     elif event.type == EventType.ON_END_OF_UTTERANCE:
         status_ui.status('thinking')
 
-    elif event.type == EventType.ON_CONVERSATION_TURN_FINISHED:
+    elif (event.type == EventType.ON_CONVERSATION_TURN_FINISHED
+          or event.type == EventType.ON_CONVERSATION_TURN_TIMEOUT
+          or event.type == EventType.ON_NO_RESPONSE):
         status_ui.status('ready')
 
     elif event.type == EventType.ON_ASSISTANT_ERROR and event.args and event.args['is_fatal']:
@@ -90,11 +59,14 @@ def process_event(assistant, event):
 
 
 def main():
+    if platform.machine() == 'armv6l':
+        print('Cannot run hotword demo on Pi Zero!')
+        exit(-1)
+
     credentials = aiy.assistant.auth_helpers.get_assistant_credentials()
-    model_id, device_id = aiy.assistant.device_helpers.get_ids(credentials)
-    with Assistant(credentials, model_id) as assistant:
+    with Assistant(credentials) as assistant:
         for event in assistant.start():
-            process_event(assistant, event)
+            process_event(event)
 
 
 if __name__ == '__main__':

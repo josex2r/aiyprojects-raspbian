@@ -1,5 +1,4 @@
-#!/bin/bash
-#
+#!/usr/bin/env python3
 # Copyright 2017 Google Inc.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -14,23 +13,41 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-set -o errexit
+"""A demo of the Piezo Buzzer."""
 
-if [[ $EUID -ne 0 ]]; then
-   echo "This script must be run as root (use sudo)" 1>&2
-   exit 1
-fi
+import aiy.toneplayer
 
-set -e
 
-sed -i \
-  -e "s/^dtparam=audio=on/#\0/" \
-  -e "s/^#\(dtparam=i2s=on\)/\1/" \
-  /boot/config.txt
-grep -q "dtoverlay=i2s-mmap" /boot/config.txt || \
-  echo "dtoverlay=i2s-mmap" >> /boot/config.txt
-grep -q "dtoverlay=googlevoicehat-soundcard" /boot/config.txt || \
-  echo "dtoverlay=googlevoicehat-soundcard" >> /boot/config.txt
-grep -q "dtparam=i2s=on" /boot/config.txt || \
-  echo "dtparam=i2s=on" >> /boot/config.txt
+def main():
+    tetris_theme = [
+        'E5q',
+        'Be',
+        'C5e',
+        'D5e',
+        'E5s',
+        'D5s',
+        'C5s',
+        'Be',
+        'Bs',
+        'Aq',
+        'Ae',
+        'C5e',
+        'E5q',
+        'D5e',
+        'C5e',
+        'Bq',
+        'Be',
+        'C5e',
+        'D5q',
+        'E5q',
+        'C5q',
+        'Aq',
+        'Aq',
+    ]
 
+    player = aiy.toneplayer.TonePlayer(22)
+    player.play(*tetris_theme)
+
+
+if __name__ == '__main__':
+    main()
