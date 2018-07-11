@@ -1,31 +1,7 @@
 #!/usr/bin/env python3
-# Copyright 2017 Google Inc.
-#
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#
-#     http://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
-
-"""Run a recognizer using the Google Assistant Library.
-
-The Google Assistant Library has direct access to the audio API, so this Python
-code doesn't need to record audio. Hot word detection "OK, Google" is supported.
-
-The Google Assistant Library can be installed with:
-    env/bin/pip install google-assistant-library==0.0.2
-
-It is available for Raspberry Pi 2/3 only; Pi Zero is not supported.
-"""
-
 
 import logging
+import platform
 import subprocess
 import sys
 import os.path
@@ -35,7 +11,7 @@ import aiy.assistant.device_helpers
 import aiy.audio
 import aiy.voicehat
 import aiy.i18n
-from google.assistant.library import Assistant
+from aiy.assistant.library import Assistant
 from google.assistant.library.event import EventType
 
 # Custom scripts
@@ -85,12 +61,26 @@ def process_event(assistant, event):
         print('ON_CONVERSATION_TURN_STARTED')
         status_ui.status('listening')
 
+    elif event.type == EventType.ON_END_OF_UTTERANCE:
+        status_ui.status('thinking')
+
+    elif (event.type == EventType.ON_CONVERSATION_TURN_FINISHED
+            or event.type == EventType.ON_CONVERSATION_TURN_TIMEOUT
+            or event.type == EventType.ON_NO_RESPONSE):
+        status_ui.status('ready')
+
+    elif event.type == EventType.ON_ASSISTANT_ERROR and event.args and event.args['is_fatal']:
+        sys.exit(1)
+
     elif event.type == EventType.ON_RECOGNIZING_SPEECH_FINISHED and event.args:
         print('ON_RECOGNIZING_SPEECH_FINISHED')
         print('You said:', event.args['text'])
         text = event.args['text'].lower()
-        flow_response = call(text)
-        action = flow_response['result']['action']
+        if text:
+            flow_response = call(text)
+            action = flow_response['result']['action']
+        else:
+            action = 'unknown'
         if 'unknown' not in action:
             print('Dialogflow action received:', action)
             assistant.stop_conversation()
@@ -120,30 +110,15 @@ def process_event(assistant, event):
             assistant.stop_conversation()
             stop_song()
 
-    elif event.type == EventType.ON_NO_RESPONSE:
-        print('ON_NO_RESPONSE')
-        assistant.stop_conversation()
-
-    elif event.type == EventType.ON_END_OF_UTTERANCE:
-        print('ON_END_OF_UTTERANCE')
-        status_ui.status('thinking')
-
-    elif event.type == EventType.ON_CONVERSATION_TURN_FINISHED:
-        print('ON_CONVERSATION_TURN_FINISHED')
-        status_ui.status('ready')
-
-    elif event.type == EventType.ON_ASSISTANT_ERROR and event.args and event.args['is_fatal']:
-        print('ON_ASSISTANT_ERROR')
-        sys.exit(1)
-
-
 def main():
+    if platform.machine() == 'armv6l':
+        print('Cannot run hotword demo on Pi Zero!')
+        exit(-1)
+
     credentials = aiy.assistant.auth_helpers.get_assistant_credentials()
-    model_id, device_id = aiy.assistant.device_helpers.get_ids(credentials)
-    with Assistant(credentials, model_id) as assistant:
+    with Assistant(credentials) as assistant:
         for event in assistant.start():
             process_event(assistant, event)
-
 
 if __name__ == '__main__':
     main()
